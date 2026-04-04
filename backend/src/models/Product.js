@@ -1,0 +1,20 @@
+import mongoose from 'mongoose';
+
+const productSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  category: { type: String, required: true, enum: ['Food', 'Beverage', 'Dessert', 'Snack', 'Other'] },
+  price: { type: Number, required: true, min: 0 },
+  description: { type: String, default: '' },
+  image: { type: String, default: '' },
+  emoji: { type: String, default: '🍽️' },
+  tax: { type: Number, default: 0 },
+  unit: { type: String, default: 'plate' },
+  isAvailable: { type: Boolean, default: true },
+  sendToKitchen: { type: Boolean, default: true },
+  variants: [{
+    attribute: String,
+    values: [{ label: String, extraPrice: Number }]
+  }]
+}, { timestamps: true });
+
+export default mongoose.model('Product', productSchema);
