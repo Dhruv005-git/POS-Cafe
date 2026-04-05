@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -12,6 +13,7 @@ import { useOrder } from '../hooks/useOrder.js';
 import PageTransition from '../components/PageTransition.jsx';
 import api from '../api/axios.js';
 import toast from 'react-hot-toast';
+import { broadcastToDisplay } from '../hooks/useBroadcast.js';
 
 // ── Customer Assign Modal ─────────────────────────────────────────────────────
 function CustomerAssignModal({ onAssign, onSkip, onClose }) {
@@ -39,7 +41,7 @@ function CustomerAssignModal({ onAssign, onSkip, onClose }) {
     }
   }, [search]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}>
       <motion.div
@@ -124,7 +126,7 @@ function CustomerAssignModal({ onAssign, onSkip, onClose }) {
         </div>
       </motion.div>
     </div>
-  );
+  , document.body);
 }
 
 // ── Main OrderScreen ──────────────────────────────────────────────────────────
@@ -133,6 +135,8 @@ export default function OrderScreen() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const table = state?.table;
+  // Register mode = /pos/register (no table) — café/shop with no floor plan
+  const isRegisterMode = !tableId;
 
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [customerModal, setCustomerModal] = useState(false);
@@ -147,24 +151,30 @@ export default function OrderScreen() {
     subtotal,
     tax,
     total,
+    discountTotal,
     addToCart,
     increment,
     decrement,
     remove,
+    editItem,
     clearCart,
+    resetOrder,
     sendToKitchen,
+    pay,
   } = useOrder(table, assignedCustomer?._id);
 
   const handleSendToKitchen = async () => {
-    // If no customer assigned yet, prompt to assign first
-    if (!assignedCustomer && !orderId) {
+    // In table mode: require customer assignment on first send
+    if (!isRegisterMode && !assignedCustomer && !orderId) {
       setCustomerModal(true);
       return;
     }
     const ok = await sendToKitchen();
-    if (ok) {
+    if (ok && !isRegisterMode) {
+      // Table mode: go back to floor after sending
       navigate('/pos/floor');
     }
+    // Register mode: stay on page so staff can collect payment
   };
 
   const handleCustomerAssigned = (customer) => {
@@ -175,8 +185,9 @@ export default function OrderScreen() {
 
   const handleCustomerSkipped = () => {
     setCustomerModal(false);
-    // Proceed to send without customer
-    sendToKitchen().then(ok => { if (ok) navigate('/pos/floor'); });
+    sendToKitchen().then(ok => {
+      if (ok && !isRegisterMode) navigate('/pos/floor');
+    });
   };
 
   const handleOpenPayment = () => {
@@ -186,7 +197,14 @@ export default function OrderScreen() {
 
   const handlePaymentSuccess = () => {
     setPayModalOpen(false);
-    navigate('/pos/floor');
+    if (isRegisterMode) {
+      // Café mode: fully reset for next customer
+      resetOrder();
+      setAssignedCustomer(null);
+      broadcastToDisplay({ type: 'idle' });
+    } else {
+      navigate('/pos/floor');
+    }
   };
 
   if (loadingOrder) {
@@ -207,45 +225,22 @@ export default function OrderScreen() {
         {/* LEFT — Product grid */}
         <div className="flex-1 overflow-hidden flex flex-col border-r border-slate-700/50">
           <div className="px-4 py-3 border-b border-slate-700/50 flex items-center gap-3 flex-shrink-0 bg-dark-800">
-            <button
-              onClick={() => navigate('/pos/floor')}
-              className="btn-secondary p-2 flex items-center justify-center"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
+            {!isRegisterMode && (
+              <button
+                onClick={() => navigate('/pos/floor')}
+                className="btn-secondary p-2 flex items-center justify-center"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
             <TableProperties className="w-4 h-4 text-slate-500" />
             <span className="font-semibold text-slate-200">
               {table ? `Table ${table.number} — ${table.floor}` : 'New Order'}
             </span>
             {table && <span className="text-xs text-slate-500">{table.seats} seats</span>}
 
-            {/* Customer badge */}
-            {assignedCustomer && (
-              <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg
-                             bg-primary-500/10 border border-primary-500/25 text-primary-400 text-xs font-medium">
-                <User className="w-3 h-3" />
-                {assignedCustomer.name}
-                <button onClick={() => setAssignedCustomer(null)}
-                  className="ml-0.5 hover:text-red-400 transition-colors">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-
-            {!assignedCustomer && (
-              <button
-                onClick={() => setCustomerModal(true)}
-                className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg
-                           border border-slate-700/40 text-slate-500 hover:text-slate-300
-                           hover:border-slate-600 text-xs transition-all duration-150"
-              >
-                <UserPlus className="w-3 h-3" />
-                Assign Customer
-              </button>
-            )}
-
             {orderId && (
-              <span className="badge-warning badge text-[10px]">
+              <span className="badge-warning badge text-[10px] ml-auto">
                 {orderStatus === 'sent' || orderStatus === 'preparing' ? '🍳 In Kitchen' : '📝 Draft'}
               </span>
             )}
@@ -264,13 +259,17 @@ export default function OrderScreen() {
             subtotal={subtotal}
             tax={tax}
             total={total}
+            discountTotal={discountTotal}
             onIncrement={increment}
             onDecrement={decrement}
             onRemove={remove}
+            onEdit={editItem}
             onClear={clearCart}
             onSendToKitchen={handleSendToKitchen}
             onPay={handleOpenPayment}
             loading={actionLoading}
+            assignedCustomer={assignedCustomer}
+            onCustomerChange={setAssignedCustomer}
           />
         </div>
 

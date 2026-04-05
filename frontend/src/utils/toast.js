@@ -23,7 +23,7 @@ export const notify = {
 
   payment: (method, amount) => {
     const icons = { cash: '💵', card: '💳', upi: '📱' };
-    toast.success(`Payment of $${amount.toFixed(2)} received via ${method}`, {
+    toast.success(`Payment of ₹${amount.toFixed(2)} received via ${method}`, {
       icon: icons[method] || '✅',
       duration: 4000,
     });

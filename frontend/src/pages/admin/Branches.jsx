@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Pencil, Trash2, GitBranch, Phone, Mail, MapPin, X, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, GitBranch, Phone, Mail, MapPin, X, Check, MonitorPlay, LayoutGrid } from 'lucide-react';
 import api from '../../api/axios.js';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const emptyForm = { name: '', address: '', phone: '', email: '' };
 
@@ -92,8 +94,32 @@ function BranchModal({ branch, onClose, onSaved }) {
 export default function Branches() {
   const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null); // null | 'new' | branch object
+  const [modal, setModal] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const { setSelectedBranch } = useAuth();
+  const navigate = useNavigate();
+
+  const handleOpenSession = (branch) => {
+    setSelectedBranch(branch);
+    // Navigate based on whether branch has floor plan (tables) or is register-only
+    if (branch.hasFloorPlan === false) {
+      navigate('/pos/register');
+    } else {
+      navigate('/pos/floor');
+    }
+    toast.success(`Opening session for ${branch.name}`);
+  };
+
+  const handleToggleFloorPlan = async (branch) => {
+    const newVal = branch.hasFloorPlan === false ? true : false;
+    try {
+      const { data } = await api.put(`/branches/${branch._id}`, { hasFloorPlan: newVal });
+      setBranches(prev => prev.map(b => b._id === branch._id ? data.branch : b));
+      toast.success(`Floor plan ${newVal ? 'enabled' : 'disabled'} for ${branch.name}`);
+    } catch {
+      toast.error('Failed to update branch');
+    }
+  };
 
   const fetchBranches = useCallback(async () => {
     try {
@@ -214,13 +240,60 @@ export default function Branches() {
                 )}
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-700/40">
+              {/* Floor Plan Toggle */}
+              <div className="mt-3 flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-xs text-slate-400 font-medium">Floor Plan</span>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full
+                    ${branch.hasFloorPlan !== false
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'bg-slate-700/60 text-slate-500'}`}>
+                    {branch.hasFloorPlan !== false ? 'Tables' : 'Register'}
+                  </span>
+                </div>
+                {/* Toggle switch */}
+                <button
+                  onClick={() => handleToggleFloorPlan(branch)}
+                  className={`relative w-9 h-5 rounded-full transition-all duration-200 flex-shrink-0
+                    ${branch.hasFloorPlan !== false ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200
+                    ${branch.hasFloorPlan !== false ? 'left-[18px]' : 'left-0.5'}`} />
+                </button>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-slate-700/40 flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium
                                  text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
                                  px-2 py-0.5 rounded-full">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   Active
                 </span>
+                <div className="flex items-center gap-2">
+                  {/* Customer Display button — only for register-only branches */}
+                  {branch.hasFloorPlan === false && (
+                    <button
+                      onClick={() => window.open('/customer', '_blank')}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold
+                                 bg-slate-700/60 text-slate-300 border border-slate-600/40
+                                 hover:bg-slate-700 transition-all duration-150"
+                      title="Open Customer Display"
+                    >
+                      <LayoutGrid className="w-3 h-3 text-primary-400" />
+                      Customer Display
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleOpenSession(branch)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+                               bg-primary-500/15 text-primary-400 border border-primary-500/25
+                               hover:bg-primary-500/25 transition-all duration-150"
+                  >
+                    <MonitorPlay className="w-3.5 h-3.5" />
+                    Open Session
+                  </button>
+                </div>
               </div>
             </motion.div>
           ))}

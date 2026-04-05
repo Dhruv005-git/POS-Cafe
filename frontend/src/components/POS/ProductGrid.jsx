@@ -16,11 +16,23 @@ export default function ProductGrid({ onAddToCart }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
+  const fetchProducts = () => {
     api.get('/products?available=true')
       .then(({ data }) => setProducts(data.products))
       .catch(() => toast.error('Failed to load products'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchProducts();
+    // Re-sync when user switches back to this tab (admin may have updated extras)
+    const onFocus = () => api.get('/products?available=true')
+      .then(({ data }) => setProducts(data.products))
+      .catch(() => {});
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') onFocus();
+    });
+    return () => document.removeEventListener('visibilitychange', onFocus);
   }, []);
 
   const filtered = products.filter(p => {

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Pencil, Trash2, Package, Search,
-  X, Check, ToggleLeft, ToggleRight,
+  X, Check, ToggleLeft, ToggleRight, Sparkles,
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import toast from 'react-hot-toast';
@@ -13,13 +13,33 @@ const EMOJIS = ['🍕','🍝','🍔','🥗','🍟','🥖','☕','🍋','🍫','�
 const emptyForm = {
   name: '', category: 'Food', price: '', emoji: '🍽️',
   description: '', tax: 5, unit: 'plate', isAvailable: true, sendToKitchen: true,
+  extras: [],
 };
 
 function ProductModal({ product, onClose, onSaved }) {
-  const [form, setForm] = useState(product || emptyForm);
+  const [form, setForm] = useState(() => ({
+    ...emptyForm,
+    ...(product || {}),
+    extras: product?.extras ? [...product.extras] : [],
+  }));
   const [saving, setSaving] = useState(false);
+  const [newExtraName, setNewExtraName] = useState('');
+  const [newExtraPrice, setNewExtraPrice] = useState('');
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }));
+
+  const addExtra = () => {
+    const name = newExtraName.trim();
+    const price = parseFloat(newExtraPrice);
+    if (!name || isNaN(price) || price < 0) return;
+    set('extras', [...form.extras, { name, price }]);
+    setNewExtraName('');
+    setNewExtraPrice('');
+  };
+
+  const removeExtra = (idx) => {
+    set('extras', form.extras.filter((_, i) => i !== idx));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,8 +67,7 @@ function ProductModal({ product, onClose, onSaved }) {
         initial={{ opacity: 0, scale: 0.95, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-dark-800 border border-slate-700/50 rounded-2xl p-6 w-full max-w-lg
-                   shadow-2xl my-4"
+        className="bg-dark-800 border border-slate-700/50 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-4"
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-display font-bold text-slate-100 text-lg">
@@ -72,8 +91,7 @@ function ProductModal({ product, onClose, onSaved }) {
                 </button>
               ))}
               <input
-                className="w-10 h-8 text-center rounded-lg bg-dark-800 border border-slate-700/50
-                           text-slate-200 text-sm"
+                className="w-10 h-8 text-center rounded-lg bg-dark-800 border border-slate-700/50 text-slate-200 text-sm"
                 value={form.emoji}
                 onChange={e => set('emoji', e.target.value)}
                 maxLength={2}
@@ -108,9 +126,12 @@ function ProductModal({ product, onClose, onSaved }) {
           {/* Price + Tax */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Price ($) *</label>
-              <input className="input" type="number" min="0" step="0.01" placeholder="9.99"
-                value={form.price} onChange={e => set('price', e.target.value)} required />
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Price (₹) *</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₹</span>
+                <input className="input pl-7" type="number" min="0" step="0.01" placeholder="99"
+                  value={form.price} onChange={e => set('price', e.target.value)} required />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1.5">Tax (%)</label>
@@ -126,6 +147,71 @@ function ProductModal({ product, onClose, onSaved }) {
               onChange={e => set('description', e.target.value)} />
           </div>
 
+          {/* ── Extras Manager ────────────────────────────────────── */}
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-semibold text-amber-400">Extras</span>
+              <span className="text-xs text-slate-500">Add-ons staff can select per item</span>
+            </div>
+
+            {/* Existing extras list */}
+            {form.extras.length > 0 && (
+              <div className="space-y-1.5">
+                {form.extras.map((extra, idx) => (
+                  <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-dark-800 rounded-xl border border-slate-700/30">
+                    <span className="text-sm text-slate-200 flex-1 truncate">{extra.name}</span>
+                    <span className="text-sm font-bold text-amber-400 flex-shrink-0">+₹{extra.price}</span>
+                    <button type="button" onClick={() => removeExtra(idx)}
+                      className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new extra row */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. Extra Cheese, Large Size"
+                value={newExtraName}
+                onChange={e => setNewExtraName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addExtra(); } }}
+                className="input flex-1 text-sm py-2"
+              />
+              <div className="relative w-24 flex-shrink-0">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">₹</span>
+                <input
+                  type="number"
+                  placeholder="0"
+                  min="0"
+                  step="1"
+                  value={newExtraPrice}
+                  onChange={e => setNewExtraPrice(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addExtra(); } }}
+                  className="input w-full pl-6 text-sm py-2"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addExtra}
+                disabled={!newExtraName.trim() || !newExtraPrice}
+                className="px-3 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30
+                           hover:bg-amber-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+                           flex-shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            {form.extras.length === 0 && (
+              <p className="text-xs text-slate-600 text-center py-1">
+                No extras yet. Add add-ons like "Extra Cheese +₹30" or "Large Size +₹50".
+              </p>
+            )}
+          </div>
+
           {/* Toggles */}
           <div className="flex gap-4">
             {[
@@ -134,8 +220,7 @@ function ProductModal({ product, onClose, onSaved }) {
             ].map(({ key, label }) => (
               <button key={key} type="button"
                 onClick={() => set(key, !form[key])}
-                className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl
-                            border transition-all duration-200
+                className={`flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-xl border transition-all duration-200
                   ${form[key]
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                     : 'bg-dark-900 text-slate-500 border-slate-700/50'
@@ -302,16 +387,25 @@ export default function AdminProducts() {
               </div>
 
               <h3 className="font-medium text-slate-200 text-sm mb-0.5 truncate">{product.name}</h3>
-              <p className="text-xs text-slate-500 mb-3 truncate">{product.description}</p>
+              <p className="text-xs text-slate-500 mb-1 truncate">{product.description}</p>
+
+              {/* Extras badge */}
+              {product.extras?.length > 0 && (
+                <div className="flex items-center gap-1 mb-2">
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  <span className="text-[10px] text-amber-400/80 font-medium">
+                    {product.extras.length} extra{product.extras.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
-                <span className="font-display font-bold text-primary-400">${product.price}</span>
+                <span className="font-display font-bold text-primary-400">₹{product.price}</span>
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-slate-600 px-2 py-0.5 rounded-full bg-dark-700 border border-slate-700/50">
                     {product.category}
                   </span>
-                  <button onClick={() => toggleAvailable(product)}
-                    className="transition-colors">
+                  <button onClick={() => toggleAvailable(product)} className="transition-colors">
                     {product.isAvailable
                       ? <ToggleRight className="w-5 h-5 text-emerald-400" />
                       : <ToggleLeft className="w-5 h-5 text-slate-600" />

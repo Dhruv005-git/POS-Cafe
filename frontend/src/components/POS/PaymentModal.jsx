@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -9,6 +10,7 @@ import {
 import api from '../../api/axios.js';
 import { sound } from '../../utils/sound.js';
 import { notify } from '../../utils/toast.js';
+import { broadcastToDisplay } from '../../hooks/useBroadcast.js';
 
 // ─── Confetti burst (pure CSS/JS, no library) ───────────────────────────────
 function ConfettiBurst() {
@@ -44,7 +46,7 @@ function ConfettiBurst() {
 }
 
 // ─── Success Screen ──────────────────────────────────────────────────────────
-function SuccessScreen({ method, total, change }) {
+function SuccessScreen({ method, total, change, tableNumber }) {
   const methodLabels = { cash: 'Cash', card: 'Card', upi: 'UPI' };
   const methodEmojis = { cash: '💵', card: '💳', upi: '📱' };
 
@@ -79,10 +81,10 @@ function SuccessScreen({ method, total, change }) {
         className="card px-8 py-4 text-center space-y-1"
       >
         <p className="text-xs text-slate-500 uppercase tracking-wider">Amount Paid</p>
-        <p className="font-display font-bold text-3xl text-primary-400">${total.toFixed(2)}</p>
+        <p className="font-display font-bold text-3xl text-primary-400">₹{total.toFixed(2)}</p>
         {method === 'cash' && change > 0 && (
           <p className="text-emerald-400 text-sm font-semibold mt-1">
-            Change: ${change.toFixed(2)}
+          Change: ₹{change.toFixed(2)}
           </p>
         )}
       </motion.div>
@@ -93,7 +95,7 @@ function SuccessScreen({ method, total, change }) {
         transition={{ delay: 0.6 }}
         className="text-slate-600 text-xs"
       >
-        Table has been freed
+        {tableNumber ? 'Table has been freed' : 'Thank you for your order!'}
       </motion.p>
     </div>
   );
@@ -164,7 +166,7 @@ function CashFlow({ total, onConfirm, loading }) {
     <div className="space-y-5">
       <div className="card p-4 flex justify-between items-center">
         <span className="text-slate-400 text-sm">Bill Amount</span>
-        <span className="font-display font-bold text-xl text-slate-100">${total.toFixed(2)}</span>
+        <span className="font-display font-bold text-xl text-slate-100">₹{total.toFixed(2)}</span>
       </div>
 
       <div className="space-y-2">
@@ -192,7 +194,7 @@ function CashFlow({ total, onConfirm, loading }) {
                 onClick={() => setReceived(String(p))}
                 className="px-3 py-1.5 rounded-lg bg-dark-700 hover:bg-dark-700/70 text-xs font-semibold text-slate-300 border border-slate-700/50 hover:border-slate-600 transition-all"
               >
-                ${p}
+                ₹{p}
               </button>
             ))}
             <button
@@ -221,7 +223,7 @@ function CashFlow({ total, onConfirm, loading }) {
               {isValid ? 'Change to Return' : 'Insufficient amount'}
             </span>
             <span className={`font-display font-bold text-xl ${isValid ? 'text-emerald-400' : 'text-red-400'}`}>
-              {isValid ? `$${change.toFixed(2)}` : `$${(total - receivedNum).toFixed(2)} short`}
+              {isValid ? `₹${change.toFixed(2)}` : `₹${(total - receivedNum).toFixed(2)} short`}
             </span>
           </motion.div>
         )}
@@ -251,7 +253,7 @@ function CardFlow({ total, onConfirm, loading }) {
         </div>
         <div className="text-center">
           <p className="text-slate-400 text-sm">Present card or tap device</p>
-          <p className="font-display font-bold text-3xl text-slate-100 mt-1">${total.toFixed(2)}</p>
+          <p className="font-display font-bold text-3xl text-slate-100 mt-1">₹{total.toFixed(2)}</p>
         </div>
 
         {/* Fake card terminal animation */}
@@ -312,7 +314,7 @@ function UpiFlow({ total, onConfirm, loading }) {
         </div>
 
         <div className="text-center space-y-1">
-          <p className="font-display font-bold text-2xl text-slate-100">${total.toFixed(2)}</p>
+          <p className="font-display font-bold text-2xl text-slate-100">₹{total.toFixed(2)}</p>
           <p className="text-xs text-slate-500">UPI ID: <span className="text-primary-400 font-mono">{upiId}</span></p>
         </div>
 
@@ -353,9 +355,15 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, orderId, cart
     if (isOpen) { setStep('method'); setMethod(null); setChange(0); }
   }, [isOpen]);
 
-  const handleSelectMethod = (m) => {
+  const handleSelectMethod = async (m) => {
     setMethod(m);
     setStep(m);
+    // Broadcast UPI screen to customer display
+    if (m === 'upi') {
+      let upiId = 'cafe@ybl';
+      try { const { data } = await api.get('/settings'); upiId = data.upiId || upiId; } catch {}
+      broadcastToDisplay({ type: 'upi', amount: total, upiId });
+    }
   };
 
   const handleConfirm = async (m, changeAmt) => {
@@ -384,8 +392,8 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, orderId, cart
       await api.put(`/orders/${id}/pay`, { method: m });
       sound.paymentDone();
       notify.payment(m, total);
+      broadcastToDisplay({ type: 'thankyou' });
       setStep('success');
-      // Notify parent after brief delay so success screen shows
       setTimeout(() => onSuccess(), 2200);
     } catch (err) {
       const msg = err.response?.data?.message || 'Payment failed';
@@ -407,7 +415,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, orderId, cart
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -420,21 +428,20 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, orderId, cart
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40"
           />
 
+          {/* Centering wrapper — flex, no transform conflict */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+
           {/* Modal panel */}
           <motion.div
-            initial={{ opacity: 0, y: 60, scale: 0.97 }}
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 40, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 26 }}
-            className="fixed left-1/2 -translate-x-1/2 w-full max-w-md z-50
-  bg-dark-850 border border-slate-700/50 shadow-2xl
-  bottom-0 rounded-t-3xl
-  sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl
-  max-h-[90vh] flex flex-col" 
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className="pointer-events-auto w-full max-w-md rounded-3xl border border-slate-700/50 shadow-2xl max-h-[85vh] flex flex-col"
             style={{ background: '#172033' }}
           >
-            {/* Handle bar (mobile) */}
-            <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mt-3 sm:hidden" />
+            {/* Spacer top */}
+            <div className="w-10 h-1 bg-slate-700/50 rounded-full mx-auto mt-3" />
 
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/50">
@@ -450,7 +457,7 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, orderId, cart
                 <div>
                   <p className="font-display font-bold text-slate-100">{stepTitle[step]}</p>
                   {tableNumber && step !== 'success' && (
-                    <p className="text-xs text-slate-500">Table {tableNumber} · ${total.toFixed(2)}</p>
+                    <p className="text-xs text-slate-500">Table {tableNumber} · ₹{total.toFixed(2)}</p>
                   )}
                 </div>
               </div>
@@ -472,16 +479,31 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, orderId, cart
                   <span className="text-xs text-slate-500 uppercase tracking-wider">Order Summary</span>
                 </div>
                 <div className="space-y-1 max-h-24 overflow-y-auto">
-                  {cartItems.map(item => (
-                    <div key={item._id} className="flex justify-between text-xs text-slate-400">
-                      <span>{item.emoji} {item.name} ×{item.quantity}</span>
-                      <span>${(item.price * item.quantity).toFixed(2)}</span>
-                    </div>
-                  ))}
+                  {cartItems.map(item => {
+                    const extrasTotal = (item.selectedExtras || []).reduce((s, e) => s + e.price, 0);
+                    const itemLine = (item.price + extrasTotal) * item.quantity;
+                    return (
+                      <div key={item._id} className="space-y-0.5">
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>{item.emoji} {item.name} ×{item.quantity}</span>
+                          <span>₹{itemLine.toFixed(2)}</span>
+                        </div>
+                        {item.selectedExtras?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pl-5">
+                            {item.selectedExtras.map(e => (
+                              <span key={e.name} className="text-[10px] text-amber-400/80 font-medium">
+                                ✨{e.name} +₹{e.price}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="flex justify-between mt-2 pt-2 border-t border-slate-700/40">
                   <span className="text-xs font-bold text-slate-300">Total</span>
-                  <span className="text-xs font-bold text-primary-400">${total.toFixed(2)}</span>
+                  <span className="text-xs font-bold text-primary-400">₹{total.toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -500,13 +522,14 @@ export default function PaymentModal({ isOpen, onClose, onSuccess, orderId, cart
                   {step === 'cash'   && <CashFlow total={total} onConfirm={handleConfirm} loading={loading} />}
                   {step === 'card'   && <CardFlow total={total} onConfirm={handleConfirm} loading={loading} />}
                   {step === 'upi'    && <UpiFlow  total={total} onConfirm={handleConfirm} loading={loading} />}
-                  {step === 'success' && <SuccessScreen method={method} total={total} change={change} />}
+                  {step === 'success' && <SuccessScreen method={method} total={total} change={change} tableNumber={tableNumber} />}
                 </motion.div>
               </AnimatePresence>
             </div>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
-  );
+  , document.body);
 }

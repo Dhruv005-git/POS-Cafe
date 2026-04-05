@@ -5,10 +5,12 @@ import { protect, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// GET /api/customers — admin only, list all customers
-router.get('/', protect, requireRole('admin'), async (req, res) => {
+// GET /api/customers — admin or staff, list all customers
+router.get('/', protect, requireRole('admin', 'staff', 'cashier'), async (req, res) => {
   try {
-    const customers = await User.find({ role: 'customer' }).sort({ createdAt: -1 });
+    const customers = await User.find({ role: 'customer' })
+      .select('name email createdAt')
+      .sort({ createdAt: -1 });
     res.json({ customers });
   } catch (err) {
     res.status(500).json({ message: err.message });

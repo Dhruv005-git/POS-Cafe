@@ -9,7 +9,7 @@ export function getRoleRedirect(role) {
   switch (role) {
     case 'admin':    return '/admin/dashboard';
     case 'staff':    return '/pos/floor';
-    case 'cashier':  return '/pos/floor'; // backward compat
+    case 'cashier':  return '/pos/floor';
     case 'customer': return '/customer';
     case 'kitchen':  return '/kitchen';
     default:         return '/pos/floor';
@@ -20,14 +20,32 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Selected branch for staff — persisted per-user in localStorage
+  const [selectedBranch, setSelectedBranchState] = useState(null);
+
   useEffect(() => {
     const token = localStorage.getItem('pos_token');
     const savedUser = localStorage.getItem('pos_user');
     if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
+      const u = JSON.parse(savedUser);
+      setUser(u);
+      // Restore selected branch for this user
+      const savedBranch = localStorage.getItem(`pos_branch_${u._id}`);
+      if (savedBranch) setSelectedBranchState(JSON.parse(savedBranch));
     }
     setLoading(false);
   }, []);
+
+  const setSelectedBranch = (branch) => {
+    setSelectedBranchState(branch);
+    if (user) {
+      if (branch) {
+        localStorage.setItem(`pos_branch_${user._id}`, JSON.stringify(branch));
+      } else {
+        localStorage.removeItem(`pos_branch_${user._id}`);
+      }
+    }
+  };
 
   const signup = async (name, email, password, role = 'staff') => {
     const { data } = await api.post('/auth/signup', { name, email, password, role });
@@ -43,6 +61,9 @@ export function AuthProvider({ children }) {
     localStorage.setItem('pos_token', data.token);
     localStorage.setItem('pos_user', JSON.stringify(data.user));
     setUser(data.user);
+    // Restore branch for this user
+    const savedBranch = localStorage.getItem(`pos_branch_${data.user._id}`);
+    if (savedBranch) setSelectedBranchState(JSON.parse(savedBranch));
     toast.success(`Welcome back, ${data.user.name}! ☕`);
     return data;
   };
@@ -51,11 +72,16 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('pos_token');
     localStorage.removeItem('pos_user');
     setUser(null);
+    setSelectedBranchState(null);
     toast.success('Logged out');
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signup, login, logout, getRoleRedirect }}>
+    <AuthContext.Provider value={{
+      user, loading, signup, login, logout,
+      getRoleRedirect,
+      selectedBranch, setSelectedBranch,
+    }}>
       {children}
     </AuthContext.Provider>
   );

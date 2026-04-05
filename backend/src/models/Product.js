@@ -11,6 +11,10 @@ const productSchema = new mongoose.Schema({
   unit: { type: String, default: 'plate' },
   isAvailable: { type: Boolean, default: true },
   sendToKitchen: { type: Boolean, default: true },
+  extras: [{
+    name:  { type: String, required: true, trim: true },
+    price: { type: Number, required: true, min: 0 },
+  }],
   variants: [{
     attribute: String,
     values: [{ label: String, extraPrice: Number }]

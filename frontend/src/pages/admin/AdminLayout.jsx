@@ -7,13 +7,13 @@ import {
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const NAV_ITEMS = [
-  { to: '/admin/dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
-  { to: '/admin/branches',   label: 'Branches',   icon: GitBranch },
-  { to: '/admin/orders',     label: 'Orders',     icon: ShoppingBag },
-  { to: '/admin/products',   label: 'Products',   icon: Package },
+  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/admin/branches', label: 'Branches', icon: GitBranch },
+  { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
+  { to: '/admin/products', label: 'Products', icon: Package },
   { to: '/admin/categories', label: 'Categories', icon: Tag },
   { to: '/admin/floor-plan', label: 'Floor Plan', icon: LayoutGrid },
-  { to: '/admin/settings',   label: 'Settings',   icon: Settings },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function AdminLayout() {
@@ -30,7 +30,7 @@ export default function AdminLayout() {
       {/* ── Sidebar ──────────────────────────────────── */}
       <aside className="w-64 flex-shrink-0 bg-dark-850 border-r border-slate-700/40
                         flex flex-col"
-             style={{ background: 'linear-gradient(180deg, #0f172a 0%, #0c1220 100%)' }}>
+        style={{ background: 'linear-gradient(180deg, #0f172a 0%, #0c1220 100%)' }}>
         {/* Logo */}
         <div className="px-6 py-5 border-b border-slate-700/40">
           <div className="flex items-center gap-3">
@@ -56,9 +56,9 @@ export default function AdminLayout() {
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                  transition-all duration-200 group
                  ${isActive
-                   ? 'bg-primary-500/15 text-primary-400 border border-primary-500/25'
-                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
-                 }`
+                  ? 'bg-primary-500/15 text-primary-400 border border-primary-500/25'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/30'
+                }`
               }
             >
               <Icon className="w-4 h-4 flex-shrink-0" />

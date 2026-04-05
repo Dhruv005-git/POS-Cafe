@@ -78,7 +78,7 @@ export default function AdminCategories() {
               <p className="text-xs text-slate-500 mb-2">products</p>
               <div className="text-xs text-slate-600 space-y-0.5">
                 <p>{available} available</p>
-                <p>avg ${avgPrice.toFixed(2)}</p>
+                <p>avg ₹{avgPrice.toFixed(2)}</p>
               </div>
             </motion.button>
           ))}
@@ -105,7 +105,7 @@ export default function AdminCategories() {
                   <p className="text-sm font-medium text-slate-200">{p.name}</p>
                   <p className="text-xs text-slate-500">{p.description}</p>
                 </div>
-                <span className="font-bold text-primary-400">${p.price}</span>
+                <span className="font-bold text-primary-400">₹{p.price}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full border font-medium
                   ${p.isAvailable
                     ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'

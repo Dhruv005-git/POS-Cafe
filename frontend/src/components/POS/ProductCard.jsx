@@ -60,7 +60,7 @@ export default function ProductCard({ product, onAdd }) {
       {/* Price + Add Button */}
       <div className="flex items-center justify-between mt-1">
         <span className="font-display font-bold text-primary-400 text-base">
-          ${product.price.toFixed(2)}
+          ₹{product.price.toFixed(2)}
         </span>
 
         <motion.button

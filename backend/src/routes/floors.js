@@ -5,14 +5,16 @@ import { protect, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// GET /api/floors — admin only, with table count
-router.get('/', protect, requireRole('admin'), async (req, res) => {
+// GET /api/floors — admin or staff, with optional ?branchId filter
+router.get('/', protect, requireRole('admin', 'staff', 'cashier'), async (req, res) => {
   try {
-    const floors = await Floor.find({ isActive: true })
+    const filter = { isActive: true };
+    if (req.query.branchId) filter.branchId = req.query.branchId;
+
+    const floors = await Floor.find(filter)
       .populate('branchId', 'name')
       .sort({ createdAt: 1 });
 
-    // Attach table count to each floor
     const floorsWithCount = await Promise.all(
       floors.map(async (floor) => {
         const tableCount = await Table.countDocuments({ floorId: floor._id, isActive: true });

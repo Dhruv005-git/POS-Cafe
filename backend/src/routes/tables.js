@@ -4,11 +4,12 @@ import { protect, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// GET /api/tables — all active tables, optional floorId filter
+// GET /api/tables — all active tables, optional floorId / branchId filter
 router.get('/', protect, async (req, res) => {
   try {
     const filter = { isActive: true };
-    if (req.query.floorId) filter.floorId = req.query.floorId;
+    if (req.query.floorId)  filter.floorId  = req.query.floorId;
+    if (req.query.branchId) filter.branchId = req.query.branchId;
 
     const tables = await Table.find(filter)
       .populate('currentOrder', 'orderNumber total status')

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutGrid, Plus, Trash2, Copy, ChevronDown, ChevronRight,
-  Users, CheckSquare, Square, X, Check, Layers,
+  Users, CheckSquare, Square, X, Check, Layers, Building2, Filter,
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import toast from 'react-hot-toast';
@@ -320,7 +320,16 @@ function FloorSection({ floor, onFloorDeleted }) {
             <Layers className="w-4 h-4 text-primary-400" />
           </div>
           <div>
-            <p className="font-display font-semibold text-slate-100">{floor.name}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-display font-semibold text-slate-100">{floor.name}</p>
+              {/* Branch badge */}
+              {floor.branchId?.name && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold
+                                 bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Building2 className="w-2.5 h-2.5" />{floor.branchId.name}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500">{tables.length} table{tables.length !== 1 ? 's' : ''}</p>
           </div>
           {expanded
@@ -442,10 +451,11 @@ function FloorSection({ floor, onFloorDeleted }) {
 
 // ── Main Floor Plan Page ─────────────────────────────────────────────────────
 export default function FloorPlan() {
-  const [floors, setFloors] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null);
+  const [floors, setFloors]       = useState([]);
+  const [branches, setBranches]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [modal, setModal]         = useState(null);
+  const [branchFilter, setBranchFilter] = useState('all'); // 'all' | branchId
 
   const fetchData = useCallback(async () => {
     try {
@@ -465,26 +475,48 @@ export default function FloorPlan() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleFloorCreated = (floor) => {
-    setFloors(prev => [...prev, floor]);
+    // Refetch to get populated branchId
+    fetchData();
   };
 
   const handleFloorDeleted = (floorId) => {
     setFloors(prev => prev.filter(f => f._id !== floorId));
   };
 
+  // Filter floors by selected branch
+  const visibleFloors = branchFilter === 'all'
+    ? floors
+    : floors.filter(f => {
+        const bId = f.branchId?._id || f.branchId;
+        return bId?.toString() === branchFilter;
+      });
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display font-bold text-2xl text-slate-100">Floor Plan</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {floors.length} floor{floors.length !== 1 ? 's' : ''} · Manage tables and seating
+            {visibleFloors.length} floor{visibleFloors.length !== 1 ? 's' : ''} · Manage tables and seating
           </p>
         </div>
-        <button onClick={() => setModal('add-floor')} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> New Floor
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Branch filter */}
+          {branches.length > 1 && (
+            <div className="flex items-center gap-2 bg-dark-800 border border-slate-700/50 rounded-xl px-3 py-2">
+              <Filter className="w-3.5 h-3.5 text-slate-500" />
+              <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)}
+                className="bg-transparent text-sm text-slate-300 outline-none cursor-pointer">
+                <option value="all">All Branches</option>
+                {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+              </select>
+            </div>
+          )}
+          <button onClick={() => setModal('add-floor')} className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" /> New Floor
+          </button>
+        </div>
       </div>
 
       {/* Floors */}
@@ -494,10 +526,10 @@ export default function FloorPlan() {
             <div key={i} className="h-48 rounded-2xl bg-dark-800 animate-pulse border border-slate-700/30" />
           ))}
         </div>
-      ) : floors.length === 0 ? (
+      ) : visibleFloors.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <LayoutGrid className="w-16 h-16 text-slate-700" />
-          <p className="text-slate-500 text-lg">No floors yet</p>
+          <p className="text-slate-500 text-lg">{branchFilter === 'all' ? 'No floors yet' : 'No floors for this branch'}</p>
           <p className="text-slate-600 text-sm">Create a floor to start adding tables</p>
           <button onClick={() => setModal('add-floor')} className="btn-primary flex items-center gap-2 mt-2">
             <Plus className="w-4 h-4" /> Create First Floor
@@ -505,7 +537,7 @@ export default function FloorPlan() {
         </div>
       ) : (
         <div className="space-y-4">
-          {floors.map(floor => (
+          {visibleFloors.map(floor => (
             <FloorSection
               key={floor._id}
               floor={floor}

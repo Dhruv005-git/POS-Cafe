@@ -1,6 +1,7 @@
 import express from 'express';
 import Order from '../models/Order.js';
 import Table from '../models/Table.js';
+import Session from '../models/Session.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -17,7 +18,7 @@ router.get('/', protect, async (req, res) => {
     }
     const orders = await Order.find(filter)
       .populate('table', 'number floor')
-      .populate('items.product', 'name emoji')
+      .populate('items.product', 'name emoji tax extras')
       .sort({ createdAt: -1 })
       .limit(100);
     res.json({ orders });
@@ -31,7 +32,7 @@ router.get('/:id', protect, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate('table', 'number floor seats')
-      .populate('items.product', 'name emoji category');
+      .populate('items.product', 'name emoji category tax extras');
     if (!order) return res.status(404).json({ message: 'Order not found' });
     res.json({ order });
   } catch (err) {
@@ -45,29 +46,41 @@ router.post('/', protect, async (req, res) => {
     const { tableId, tableNumber, items, notes, customerId } = req.body;
     const TAX_RATE = 0.05;
 
+    // Helper: effective price per unit after override and discount
+    const effectiveUnit = (i) => {
+      const base   = (i.priceOverride != null) ? i.priceOverride : i.price;
+      const disc   = (i.discount || 0) / 100;
+      const extras = (i.selectedExtras || []).reduce((s, e) => s + e.price, 0);
+      return base * (1 - disc) + extras;
+    };
+
     // If table has an existing unpaid order, merge items into it
     if (tableId) {
       const table = await Table.findById(tableId).populate('currentOrder');
       if (table?.currentOrder && table.currentOrder.paymentStatus === 'unpaid') {
         const existingOrder = table.currentOrder;
 
-        // Merge: for each incoming item, add to existing or increment quantity
+        // Merge: for each incoming item, add quantity or push new
         for (const newItem of items) {
           const existing = existingOrder.items.find(
             i => i.product.toString() === newItem.product
           );
           if (existing) {
             existing.quantity += newItem.quantity;
+            // Update notes/override/discount if provided
+            if (newItem.notes)         existing.notes         = newItem.notes;
+            if (newItem.priceOverride != null) existing.priceOverride = newItem.priceOverride;
+            if (newItem.discount)      existing.discount      = newItem.discount;
           } else {
             existingOrder.items.push(newItem);
           }
         }
 
-        // Recalculate totals
-        const subtotal = existingOrder.items.reduce((s, i) => s + i.price * i.quantity, 0);
+        // Recalculate totals with effective prices
+        const subtotal = existingOrder.items.reduce((s, i) => s + effectiveUnit(i) * i.quantity, 0);
         existingOrder.subtotal = parseFloat(subtotal.toFixed(2));
-        existingOrder.tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
-        existingOrder.total = parseFloat((subtotal + existingOrder.tax).toFixed(2));
+        existingOrder.tax      = parseFloat((subtotal * TAX_RATE).toFixed(2));
+        existingOrder.total    = parseFloat((subtotal + existingOrder.tax).toFixed(2));
         if (notes) existingOrder.notes = notes;
 
         await existingOrder.save();
@@ -75,10 +88,10 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
-    // Create fresh order
-    const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const tax = parseFloat((subtotal * TAX_RATE).toFixed(2));
-    const total = parseFloat((subtotal + tax).toFixed(2));
+    // Create fresh order — compute totals using effective prices
+    const subtotal = items.reduce((s, i) => s + effectiveUnit(i) * i.quantity, 0);
+    const tax      = parseFloat((subtotal * TAX_RATE).toFixed(2));
+    const total    = parseFloat((subtotal + tax).toFixed(2));
 
     const order = await Order.create({
       table: tableId || null,
@@ -157,6 +170,30 @@ router.put('/:id/pay', protect, async (req, res) => {
         status: 'available',
         currentOrder: null,
       });
+    }
+
+    // ── Update active session counters ──────────────────────────────────────
+    // Try to find the open session for this branch; fall back to any open session
+    let openSession = null;
+    if (order.table) {
+      // Table order: find session for the table's branch
+      const tableDoc = await Table.findById(order.table).select('branchId');
+      if (tableDoc?.branchId) {
+        openSession = await Session.findOne({ status: 'open', branchId: tableDoc.branchId });
+      }
+    }
+    if (!openSession) {
+      // Register mode or fallback: pick any open session
+      openSession = await Session.findOne({ status: 'open' }).sort({ openedAt: -1 });
+    }
+    if (openSession) {
+      const isCash = (method || 'cash') === 'cash';
+      openSession.totalOrders += 1;
+      openSession.totalSales  = parseFloat((openSession.totalSales + order.total).toFixed(2));
+      if (isCash) {
+        openSession.cashSales = parseFloat((openSession.cashSales + order.total).toFixed(2));
+      }
+      await openSession.save();
     }
 
     const io = req.app.get('io');

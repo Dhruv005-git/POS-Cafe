@@ -1,21 +1,43 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios.js';
 import toast from 'react-hot-toast';
+import { broadcastToDisplay } from './useBroadcast.js';
 
-const TAX_RATE = 0.05;
-
-function calcTotals(items) {
-  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const tax = subtotal * TAX_RATE;
-  return { subtotal, tax, total: subtotal + tax };
+// Per-item tax + optional price override + discount + selected extras
+function calcTotals(items, defaultTaxRate = 0.05) {
+  let subtotal = 0;
+  let tax = 0;
+  let discountTotal = 0;
+  for (const i of items) {
+    const basePrice    = i.priceOverride != null ? i.priceOverride : i.price;
+    const discFrac     = (i.discount || 0) / 100;
+    const effectiveBase = basePrice * (1 - discFrac);
+    const extrasTotal  = (i.selectedExtras || []).reduce((s, e) => s + e.price, 0);
+    const effectiveP   = effectiveBase + extrasTotal;   // extras are not discounted
+    const lineTotal    = effectiveP * i.quantity;
+    const discounted   = (basePrice - effectiveBase) * i.quantity;
+    const rate         = (i.tax > 0 ? i.tax : defaultTaxRate * 100) / 100;
+    subtotal       += lineTotal;
+    tax            += lineTotal * rate;
+    discountTotal  += discounted;
+  }
+  return { subtotal, tax, total: subtotal + tax, discountTotal };
 }
 
 export function useOrder(table, customerId = null) {
-  const [orderId, setOrderId] = useState(null);       // DB order _id
-  const [cartItems, setCartItems] = useState([]);      // local cart state (mirrors DB items)
+  const [orderId, setOrderId] = useState(null);
+  const [cartItems, setCartItems] = useState([]);
   const [orderStatus, setOrderStatus] = useState('draft');
   const [loadingOrder, setLoadingOrder] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0.05); // from settings
+
+  // Fetch default tax rate from settings once
+  useEffect(() => {
+    api.get('/settings').then(({ data }) => {
+      if (data.taxRate != null) setDefaultTaxRate(data.taxRate);
+    }).catch(() => {});
+  }, []);
 
   // On mount: if table has a currentOrder, load it from DB
   useEffect(() => {
@@ -33,15 +55,19 @@ export function useOrder(table, customerId = null) {
           if (order && order.paymentStatus === 'unpaid') {
             setOrderId(order._id);
             setOrderStatus(order.status);
-            // Map DB items into cart shape (add emoji from populated product)
             setCartItems(order.items.map(i => ({
               _id: i.product?._id || i.product,
-              itemId: i._id,           // DB subdoc _id (for removal)
+              itemId: i._id,
               name: i.name,
               price: i.price,
               quantity: i.quantity,
               emoji: i.product?.emoji || '🍽️',
-              notes: i.notes,
+              tax: i.product?.tax ?? 0,
+              notes: i.notes || '',
+              priceOverride: i.priceOverride ?? null,
+              discount: i.discount ?? 0,
+              availableExtras: i.product?.extras || [],
+              selectedExtras: i.selectedExtras || [],
             })));
           }
         } catch {
@@ -64,12 +90,17 @@ export function useOrder(table, customerId = null) {
       }
       return [...prev, {
         _id: product._id,
-        itemId: null,        // not yet in DB
+        itemId: null,
         name: product.name,
         price: product.price,
         quantity: 1,
         emoji: product.emoji || '🍽️',
+        tax: product.tax ?? 0,
         notes: '',
+        priceOverride: null,
+        discount: 0,
+        availableExtras: product.extras || [],
+        selectedExtras: [],
       }];
     });
   }, []);
@@ -93,7 +124,21 @@ export function useOrder(table, customerId = null) {
     setCartItems(prev => prev.filter(i => i._id !== productId));
   }, []);
 
+  // Edit notes / price override / discount for a specific item
+  const editItem = useCallback((productId, changes) => {
+    setCartItems(prev => prev.map(i =>
+      i._id === productId ? { ...i, ...changes } : i
+    ));
+  }, []);
+
   const clearCart = useCallback(() => setCartItems([]), []);
+
+  // Full reset for register mode — clears cart + order state for next customer
+  const resetOrder = useCallback(() => {
+    setCartItems([]);
+    setOrderId(null);
+    setOrderStatus('draft');
+  }, []);
 
   // Flush cart to DB: creates or merges order, returns orderId
   const flushToDb = async () => {
@@ -109,6 +154,10 @@ export function useOrder(table, customerId = null) {
         price: i.price,
         quantity: i.quantity,
         emoji: i.emoji,
+        notes: i.notes || '',
+        priceOverride: i.priceOverride ?? null,
+        discount: i.discount ?? 0,
+        selectedExtras: i.selectedExtras || [],
       })),
     };
 
@@ -122,6 +171,12 @@ export function useOrder(table, customerId = null) {
       price: i.price,
       quantity: i.quantity,
       emoji: i.product?.emoji || '🍽️',
+      tax: i.product?.tax ?? 0,
+      notes: i.notes || '',
+      priceOverride: i.priceOverride ?? null,
+      discount: i.discount ?? 0,
+      availableExtras: i.product?.extras || [],
+      selectedExtras: i.selectedExtras || [],
     })));
     return newId;
   };
@@ -162,7 +217,17 @@ export function useOrder(table, customerId = null) {
     }
   };
 
-  const { subtotal, tax, total } = calcTotals(cartItems);
+  const { subtotal, tax, total, discountTotal } = calcTotals(cartItems, defaultTaxRate);
+
+  // Broadcast cart to customer display whenever it changes
+  useEffect(() => {
+    if (cartItems.length === 0) return;
+    broadcastToDisplay({
+      type: 'bill',
+      order: { items: cartItems, subtotal, tax, total, discountTotal },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems]);
 
   return {
     cartItems,
@@ -173,11 +238,16 @@ export function useOrder(table, customerId = null) {
     subtotal,
     tax,
     total,
+    discountTotal,
+    defaultTaxRate,
     addToCart,
     increment,
     decrement,
     remove,
+    editItem,
     clearCart,
+    resetOrder,
     sendToKitchen,
+    pay,
   };
 }

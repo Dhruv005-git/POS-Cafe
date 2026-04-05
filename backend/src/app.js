@@ -15,6 +15,7 @@ import reportsRouter from './routes/reports.js';
 import branchRouter from './routes/branches.js';
 import floorRouter from './routes/floors.js';
 import customerRouter from './routes/customers.js';
+import menuRouter     from './routes/menu.js';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/branches', branchRouter);
 app.use('/api/floors', floorRouter);
 app.use('/api/customers', customerRouter);
+app.use('/api/menu',      menuRouter);
 
 io.on('connection', (socket) => {
   console.log(`🔌 Socket connected: ${socket.id}`);

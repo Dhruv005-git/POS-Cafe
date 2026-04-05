@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChefHat, Clock, Wifi, WifiOff, CheckCheck, Flame, UtensilsCrossed } from 'lucide-react';
+import { ChefHat, Clock, Wifi, WifiOff, CheckCheck, Flame, UtensilsCrossed, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios.js';
 import { useSocketEvent, useSocketConnected } from '../hooks/useSocket.js';
 import { sound } from '../utils/sound.js';
@@ -100,6 +101,16 @@ function OrderCard({ order, onAdvance, onItemToggle }) {
                 ${item.status === 'ready' ? 'line-through text-slate-500' : 'text-slate-200'}`}>
                 {item.name}
               </p>
+              {item.selectedExtras?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {item.selectedExtras.map(e => (
+                    <span key={e.name} className="text-[10px] font-semibold px-1.5 py-0.5
+                      rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                      ✨ {e.name}
+                    </span>
+                  ))}
+                </div>
+              )}
               {item.notes && (
                 <p className="text-xs text-amber-400 mt-0.5">📝 {item.notes}</p>
               )}
@@ -226,6 +237,19 @@ export default function KitchenDisplay() {
               : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
             {connected ? <><Wifi className="w-3 h-3" /> Live</> : <><WifiOff className="w-3 h-3" /> Reconnecting...</>}
           </div>
+          {/* Logout */}
+          <button
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = '/login';
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold
+                       bg-slate-700/60 text-slate-400 border border-slate-700/40
+                       hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Logout
+          </button>
         </div>
       </header>
 

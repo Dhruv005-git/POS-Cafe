@@ -131,6 +131,10 @@
   .custom-scrollbar::-webkit-scrollbar { width: 4px; }
   .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-slate-700 rounded-full; }
 
+  /* ── Hide scrollbar (mobile horizontal tabs) ────────────────────────── */
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
   /* ── Focus ring (keyboard nav) ──────────────────────────────────────── */
   .focus-ring {
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-900;

@@ -1,13 +1,16 @@
 import mongoose from 'mongoose';
 
 const orderItemSchema = new mongoose.Schema({
-  product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  name: String,
-  price: Number,
-  emoji: { type: String, default: '🍽️' },   // ← ADD THIS LINE
-  quantity: { type: Number, default: 1 },
-  notes: { type: String, default: '' },
-  status: { type: String, enum: ['pending', 'preparing', 'ready'], default: 'pending' }
+  product:       { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  name:          String,
+  price:         Number,                              // original product price
+  priceOverride: { type: Number, default: null },     // staff-set price override
+  discount:      { type: Number, default: 0 },        // item-level discount %
+  emoji:         { type: String, default: '🍽️' },
+  quantity:      { type: Number, default: 1 },
+  notes:         { type: String, default: '' },
+  status:        { type: String, enum: ['pending', 'preparing', 'ready'], default: 'pending' },
+  selectedExtras: [{ name: String, price: Number }],
 });
 
 const orderSchema = new mongoose.Schema({

@@ -19,6 +19,7 @@ import KitchenDisplay  from './pages/KitchenDisplay.jsx';
 import CustomerDisplay from './pages/CustomerDisplay.jsx';
 import Dashboard       from './pages/Dashboard.jsx';
 import OrderScreen     from './pages/OrderScreen.jsx';
+import CustomerOrderPage from './pages/CustomerOrderPage.jsx';
 
 // Admin Pages
 import AdminLayout     from './pages/admin/AdminLayout.jsx';
@@ -68,6 +69,9 @@ function AnimatedRoutes() {
         {/* Customer display — smart (passive kiosk OR logged-in personal) */}
         <Route path="/customer" element={<CustomerDisplay />} />
 
+        {/* Mobile ordering — public, no auth (link via QR at table) */}
+        <Route path="/menu" element={<CustomerOrderPage />} />
+
         {/* POS Root → redirect */}
         <Route
           path="/pos"
@@ -90,9 +94,21 @@ function AnimatedRoutes() {
           }
         />
 
-        {/* Order Screen */}
+        {/* Order Screen — with table */}
         <Route
           path="/pos/order/:tableId"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'staff', 'cashier']}>
+              <POSLayout>
+                <OrderScreen />
+              </POSLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Register — no table (for branches without floor plan) */}
+        <Route
+          path="/pos/register"
           element={
             <ProtectedRoute allowedRoles={['admin', 'staff', 'cashier']}>
               <POSLayout>
