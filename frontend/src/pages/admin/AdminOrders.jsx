@@ -3,9 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShoppingBag, Search, Eye,
   Banknote, CreditCard, Smartphone, CheckCircle2,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import api from '../../api/axios.js';
 import toast from 'react-hot-toast';
+
+const PAGE_SIZE = 15;
 
 const STATUS_BADGE = {
   draft:     'bg-slate-500/20 text-slate-400 border-slate-500/30',
@@ -40,6 +43,7 @@ export default function AdminOrders() {
   const [search, setSearch]       = useState('');
   const [expanded, setExpanded]   = useState(null);
   const [paying, setPaying]       = useState(null);   // orderId being paid
+  const [page, setPage]           = useState(0);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -55,6 +59,9 @@ export default function AdminOrders() {
   }, [statusFilter]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  // Reset to page 0 whenever filters/search change
+  useEffect(() => { setPage(0); }, [statusFilter, search]);
 
   const collectPayment = async (orderId, method) => {
     setPaying(orderId);
@@ -82,17 +89,23 @@ export default function AdminOrders() {
     (o.notes || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged      = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   const unpaidCount = orders.filter(o =>
     o.paymentStatus === 'unpaid' && !['draft','cancelled'].includes(o.status)
   ).length;
 
   return (
-    <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="font-display font-bold text-2xl text-slate-100">Orders</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{orders.length} orders loaded</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {filtered.length} order{filtered.length !== 1 ? 's' : ''}
+            {filtered.length !== orders.length && ` (filtered from ${orders.length})`}
+          </p>
         </div>
         {unpaidCount > 0 && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl
@@ -158,7 +171,7 @@ export default function AdminOrders() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((order, i) => {
+                paged.map((order, i) => {
                   const Meth = order.paymentMethod ? METHOD_META[order.paymentMethod] : null;
                   const isExpanded = expanded === order._id;
                   const canPay = order.paymentStatus === 'unpaid' &&
@@ -310,6 +323,64 @@ export default function AdminOrders() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700/30">
+            <p className="text-xs text-slate-500">
+              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of{' '}
+              <span className="font-semibold text-slate-400">{filtered.length}</span> orders
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="w-8 h-8 rounded-lg flex items-center justify-center
+                           bg-dark-700 border border-slate-700/40 text-slate-400
+                           hover:bg-dark-600 hover:text-slate-200 disabled:opacity-30 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Page number pills */}
+              {Array.from({ length: totalPages }, (_, i) => i)
+                .filter(i => i === 0 || i === totalPages - 1 || Math.abs(i - page) <= 1)
+                .reduce((acc, i, idx, arr) => {
+                  if (idx > 0 && i - arr[idx - 1] > 1) acc.push('…');
+                  acc.push(i);
+                  return acc;
+                }, [])
+                .map((item, idx) =>
+                  item === '…' ? (
+                    <span key={`ellipsis-${idx}`} className="w-8 text-center text-slate-600 text-xs">…</span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setPage(item)}
+                      className={`w-8 h-8 rounded-lg text-xs font-bold transition-all
+                        ${ item === page
+                          ? 'bg-primary-500/20 text-primary-400 border border-primary-500/40'
+                          : 'bg-dark-700 border border-slate-700/40 text-slate-500 hover:text-slate-300 hover:bg-dark-600'
+                        }`}
+                    >
+                      {item + 1}
+                    </button>
+                  )
+                )
+              }
+
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="w-8 h-8 rounded-lg flex items-center justify-center
+                           bg-dark-700 border border-slate-700/40 text-slate-400
+                           hover:bg-dark-600 hover:text-slate-200 disabled:opacity-30 transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

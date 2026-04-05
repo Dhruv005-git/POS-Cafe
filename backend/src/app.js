@@ -15,6 +15,7 @@ import reportsRouter from './routes/reports.js';
 import branchRouter from './routes/branches.js';
 import floorRouter from './routes/floors.js';
 import customerRouter from './routes/customers.js';
+import categoryRouter from './routes/categories.js';
 import menuRouter     from './routes/menu.js';
 
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/branches', branchRouter);
 app.use('/api/floors', floorRouter);
 app.use('/api/customers', customerRouter);
+app.use('/api/categories', categoryRouter);
 app.use('/api/menu',      menuRouter);
 
 io.on('connection', (socket) => {
@@ -63,7 +65,7 @@ const PORT = process.env.PORT || 5000;
 const start = async () => {
   await connectDB();
   httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(` Server running on http://localhost:${PORT}`);
   });
 };
 start();

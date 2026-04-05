@@ -7,7 +7,6 @@ import {
 import api from '../../api/axios.js';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = ['Food', 'Beverage', 'Dessert', 'Snack', 'Other'];
 const EMOJIS = ['🍕','🍝','🍔','🥗','🍟','🥖','☕','🍋','🍫','🍰','🥭','🍣','🍜','🥩','🧁','🍦','🥤','🫖','🍵','🍱'];
 
 const emptyForm = {
@@ -16,15 +15,18 @@ const emptyForm = {
   extras: [],
 };
 
-function ProductModal({ product, onClose, onSaved }) {
+function ProductModal({ product, categories: categoriesFromParent, onClose, onSaved }) {
   const [form, setForm] = useState(() => ({
     ...emptyForm,
     ...(product || {}),
     extras: product?.extras ? [...product.extras] : [],
   }));
-  const [saving, setSaving] = useState(false);
-  const [newExtraName, setNewExtraName] = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [newExtraName, setNewExtraName]   = useState('');
   const [newExtraPrice, setNewExtraPrice] = useState('');
+  const categories = categoriesFromParent?.length > 0
+    ? categoriesFromParent
+    : ['Food', 'Beverage', 'Dessert', 'Snack', 'Other'];
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
@@ -110,16 +112,19 @@ function ProductModal({ product, onClose, onSaved }) {
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Category *</label>
             <div className="flex gap-2 flex-wrap">
-              {CATEGORIES.map(cat => (
-                <button key={cat} type="button" onClick={() => set('category', cat)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150
-                    ${form.category === cat
-                      ? 'bg-primary-500/20 text-primary-400 border-primary-500/40'
-                      : 'border-slate-700/50 text-slate-400 hover:border-slate-600'
-                    }`}>
-                  {cat}
-                </button>
-              ))}
+              {categories.map(cat => {
+                const name = typeof cat === 'string' ? cat : cat.name;
+                return (
+                  <button key={name} type="button" onClick={() => set('category', name)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150
+                      ${form.category === name
+                        ? 'bg-primary-500/20 text-primary-400 border-primary-500/40'
+                        : 'border-slate-700/50 text-slate-400 hover:border-slate-600'
+                      }`}>
+                    {typeof cat === 'string' ? cat : `${cat.emoji} ${cat.name}`}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -251,17 +256,22 @@ function ProductModal({ product, onClose, onSaved }) {
 }
 
 export default function AdminProducts() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null);
-  const [search, setSearch] = useState('');
-  const [catFilter, setCatFilter] = useState('all');
-  const [deleting, setDeleting] = useState(null);
+  const [products, setProducts]     = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [modal, setModal]           = useState(null);
+  const [search, setSearch]         = useState('');
+  const [catFilter, setCatFilter]   = useState('all');
+  const [deleting, setDeleting]     = useState(null);
 
   const fetchProducts = useCallback(async () => {
     try {
-      const { data } = await api.get('/products');
-      setProducts(data.products);
+      const [prodRes, catRes] = await Promise.all([
+        api.get('/products'),
+        api.get('/categories'),
+      ]);
+      setProducts(prodRes.data.products);
+      setCategories(catRes.data.categories || []);
     } catch {
       toast.error('Failed to load products');
     } finally {
@@ -331,7 +341,7 @@ export default function AdminProducts() {
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {['all', ...CATEGORIES].map(c => (
+          {['all', ...categories.map(c => c.name)].map(c => (
             <button key={c} onClick={() => setCatFilter(c)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150
                 ${catFilter === c
@@ -423,6 +433,7 @@ export default function AdminProducts() {
         {modal && (
           <ProductModal
             product={modal === 'new' ? null : modal}
+            categories={categories}
             onClose={() => setModal(null)}
             onSaved={handleSaved}
           />
