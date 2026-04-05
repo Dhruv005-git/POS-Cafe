@@ -59,8 +59,8 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
 
-        {/* Public */}
-        <Route path="/" element={<HomePage />} />
+        {/* Root → Login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<AuthPage />} />
 
         {/* Kitchen — unprotected (kiosk mode) */}

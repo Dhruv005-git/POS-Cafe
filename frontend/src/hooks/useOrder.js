@@ -35,7 +35,7 @@ export function useOrder(table, customerId = null) {
   // Fetch default tax rate from settings once
   useEffect(() => {
     api.get('/settings').then(({ data }) => {
-      if (data.taxRate != null) setDefaultTaxRate(data.taxRate);
+      if (data.taxRate != null) setDefaultTaxRate(data.taxRate / 100); // API returns % (e.g. 5), calcTotals needs decimal (0.05)
     }).catch(() => {});
   }, []);
 

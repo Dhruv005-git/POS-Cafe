@@ -4,10 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth, getRoleRedirect } from '../context/AuthContext.jsx';
 
 const ROLES = [
-  { value: 'admin',    label: 'Admin',    icon: '👑', desc: 'Full access' },
-  { value: 'staff',    label: 'Staff',    icon: '🧾', desc: 'POS & orders' },
-  { value: 'kitchen',  label: 'Kitchen',  icon: '👨‍🍳', desc: 'Kitchen display' },
-  { value: 'customer', label: 'Customer', icon: '🙋', desc: 'Order tracking' },
+  { value: 'admin',   label: 'Admin',   icon: '👑', desc: 'Full access',     accent: 'text-primary-400', iconBg: 'bg-primary-500/20', ring: 'border-primary-500/60 bg-primary-500/10 shadow-primary-500/10' },
+  { value: 'staff',   label: 'Staff',   icon: '🧾', desc: 'POS & orders',    accent: 'text-blue-400',    iconBg: 'bg-blue-500/20',    ring: 'border-blue-500/60 bg-blue-500/10 shadow-blue-500/10' },
+  { value: 'kitchen', label: 'Kitchen', icon: '👨‍🍳', desc: 'Kitchen display', accent: 'text-amber-400',   iconBg: 'bg-amber-500/20',   ring: 'border-amber-500/60 bg-amber-500/10 shadow-amber-500/10' },
 ];
 
 export default function AuthPage() {
@@ -232,23 +231,36 @@ export default function AuthPage() {
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Role
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {ROLES.map((r) => (
-                      <button
-                        key={r.value}
-                        type="button"
-                        onClick={() => setForm((f) => ({ ...f, role: r.value }))}
-                        className={`p-3 rounded-xl border text-center transition-all duration-200
-                          ${form.role === r.value
-                            ? 'border-primary-500/70 bg-primary-500/15 shadow-sm shadow-primary-500/20'
-                            : 'border-slate-700/50 bg-dark-800 hover:border-slate-600'
-                          }`}
-                      >
-                        <div className="text-xl mb-1">{r.icon}</div>
-                        <div className="text-xs font-medium text-slate-200">{r.label}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{r.desc}</div>
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-3 gap-2">
+                    {ROLES.map((r) => {
+                      const active = form.role === r.value;
+                      return (
+                        <button
+                          key={r.value}
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, role: r.value }))}
+                          className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border
+                            text-center transition-all duration-200 group
+                            ${ active
+                              ? `${r.ring} shadow-sm`
+                              : 'border-slate-700/50 bg-dark-800 hover:border-slate-600 hover:bg-dark-700/50'
+                            }`}
+                        >
+                          {active && (
+                            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                          )}
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg
+                            transition-transform duration-200 group-hover:scale-110
+                            ${active ? r.iconBg : 'bg-slate-700/40'}`}>
+                            {r.icon}
+                          </div>
+                          <div className={`text-xs font-bold transition-colors ${ active ? r.accent : 'text-slate-300' }`}>
+                            {r.label}
+                          </div>
+                          <div className="text-[10px] text-slate-500 leading-none">{r.desc}</div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}
@@ -277,47 +289,42 @@ export default function AuthPage() {
           {/* Demo credentials */}
           {mode === 'login' && (
             <motion.div
-              className="mt-6 p-4 rounded-xl bg-dark-800 border border-slate-700/30"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              className="mt-6 rounded-2xl bg-dark-800 border border-slate-700/30 overflow-hidden"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <p className="text-xs text-slate-500 mb-3 font-medium uppercase tracking-wide">
-                Quick demo fill
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, email: 'admin@cafe.com', password: 'admin123' })}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-primary-500/10 text-primary-400
-                             border border-primary-500/20 hover:bg-primary-500/20 transition-colors"
-                >
-                  👑 Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, email: 'staff@cafe.com', password: 'staff123' })}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-slate-700/40 text-slate-400
-                             border border-slate-600/30 hover:bg-slate-700/60 transition-colors"
-                >
-                  🧾 Staff
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, email: 'kitchen@cafe.com', password: 'kitchen123' })}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400
-                             border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
-                >
-                  👨‍🍳 Kitchen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, email: 'customer@cafe.com', password: 'customer123' })}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400
-                             border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
-                >
-                  🙋 Customer
-                </button>
+              {/* Header */}
+              <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-slate-700/20">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse" />
+                <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">
+                  Try a demo account
+                </p>
+              </div>
+              {/* Role cards */}
+              <div className="grid grid-cols-3 divide-x divide-slate-700/30">
+                {[
+                  { icon: '👑', label: 'Admin',   desc: 'Full access',  email: 'admin@cafe.com',   password: 'admin123',   iconBg: 'bg-primary-500/15', accent: 'text-primary-400', hover: 'hover:bg-primary-500/8' },
+                  { icon: '🧾', label: 'Staff',   desc: 'POS & orders', email: 'staff@cafe.com',   password: 'staff123',   iconBg: 'bg-blue-500/15',    accent: 'text-blue-400',    hover: 'hover:bg-blue-500/8' },
+                  { icon: '👨‍🍳', label: 'Kitchen', desc: 'Cook queue',  email: 'kitchen@cafe.com', password: 'kitchen123', iconBg: 'bg-amber-500/15',   accent: 'text-amber-400',   hover: 'hover:bg-amber-500/8' },
+                ].map((role) => (
+                  <motion.button
+                    key={role.label}
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setForm({ ...form, email: role.email, password: role.password })}
+                    className={`group flex flex-col items-center gap-1.5 py-3.5 px-2 w-full
+                                transition-all duration-200 ${role.hover}`}
+                  >
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center
+                                    text-lg transition-transform duration-200 group-hover:scale-110
+                                    ${role.iconBg}`}>
+                      {role.icon}
+                    </div>
+                    <span className={`text-xs font-bold ${role.accent}`}>{role.label}</span>
+                    <span className="text-[10px] text-slate-600">{role.desc}</span>
+                  </motion.button>
+                ))}
               </div>
             </motion.div>
           )}
